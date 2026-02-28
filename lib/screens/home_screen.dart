@@ -42,6 +42,7 @@ class HomeScreen extends StatelessWidget {
                 },
               ),
             ),
+            const _CopyrightFooter(),
           ],
         ),
       ),
@@ -450,6 +451,77 @@ class _PrayerRow extends StatelessWidget {
     final now = DateTime.now();
     final hasPassed = prayer.iqamaTime.isBefore(now);
 
+    // These prayers only show the iqama (right) time, not the azan (left) time.
+    const hiddenAzanPrayers = {'Jumua', 'Taraveeh', 'Tahajjud', 'Imsak', 'Eid'};
+    final hideAzan = hiddenAzanPrayers.contains(prayer.name);
+
+    // Simplified layout for secondary prayers — name left, adjust center, time right.
+    if (hideAzan) {
+      return Container(
+        decoration: BoxDecoration(
+          color: isNext ? const Color(0xFFd4edda) : Colors.white,
+          border: Border(
+            bottom: BorderSide(color: Colors.grey.shade300, width: 0.5),
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        child: Row(
+          children: [
+            // Prayer name (left)
+            Expanded(
+              child: Text(
+                prayer.name,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: hasPassed && !isNext ? Colors.grey : Colors.black87,
+                ),
+              ),
+            ),
+            // Adjust button (center)
+            GestureDetector(
+              onTap: () => _showAdjustDialog(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isNext
+                      ? const Color(0xFF5cb85c)
+                      : const Color(0xFF8e9aaf),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Adjust Time',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            // Iqama time (right)
+            Expanded(
+              child: Text(
+                prayer.formattedIqamaTime,
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: isNext
+                      ? const Color(0xFF28a745)
+                      : hasPassed
+                          ? Colors.grey
+                          : Colors.black87,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: isNext ? const Color(0xFFd4edda) : Colors.white,
@@ -503,7 +575,7 @@ class _PrayerRow extends StatelessWidget {
 
           const SizedBox(width: 6),
 
-          // 4. Offset / fixed-time box (tappable to adjust)
+          // 4. Offset box (tappable to adjust)
           Expanded(
             child: Center(
               child: GestureDetector(
@@ -632,5 +704,63 @@ class _PrayerRow extends StatelessWidget {
         ),
       );
     }
+  }
+}
+
+// =============================================================================
+// Copyright Footer
+// =============================================================================
+
+class _CopyrightFooter extends StatelessWidget {
+  const _CopyrightFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF1a1a2e), Color(0xFF2d3a4a)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: const Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Developed by Alan Sherhan K P',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+          SizedBox(height: 2),
+          Text(
+            'alansherhan10@gmail.com',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.tealAccent,
+              fontSize: 11,
+              letterSpacing: 0.2,
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            '© 2026 AzanTracker. All rights reserved.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white38,
+              fontSize: 10,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

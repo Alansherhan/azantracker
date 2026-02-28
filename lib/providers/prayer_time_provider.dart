@@ -144,6 +144,11 @@ class PrayerTimeProvider extends ChangeNotifier {
     }
     return null;
   }
+  // Void iqmaAfter(PrayerEntry prayer) {
+  //   final next = nextIqamaPrayer;
+  //   if (next == null) return;
+  //   final mins = next.iqamaTime.difference(_currentTime).inMinutes;
+  // }
 
   /// Human-readable message: "Dhuhr Iqama after 4 minutes".
   String get nextIqamaMessage {
@@ -165,13 +170,13 @@ class PrayerTimeProvider extends ChangeNotifier {
     'Maghrib': 5,
     'Isha': 15,
     'Sunrise': 15,
-    'Tahajjud': -50,
     'Imsak': -15,
   };
 
   static const _fixedDefaults = <String, List<int>>{
     'Jumua': [13, 0],
     'Taraveeh': [20, 45],
+    'Tahajjud': [3, 30],
     'Eid': [7, 30],
   };
 
@@ -318,7 +323,7 @@ class PrayerTimeProvider extends ChangeNotifier {
       _buildEntry('Jumua', dhuhr),
       _buildEntry('Taraveeh', isha),
       _buildEntry('Tahajjud', fajr),
-      _buildEntry('Imsak', fajr),
+      // _buildEntry('Imsak', fajr),
       _buildEntry('Eid', sunrise),
     ];
 
