@@ -146,6 +146,11 @@ class _ClockHeader extends StatelessWidget {
           ),
 
           const SizedBox(height: 2),
+          Text(provider.masjidName.isEmpty ? 'Your Masjid Name' : provider.masjidName,
+              style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic)),
 
           // ---- Hijri date + day adjustment ----
           Row(
