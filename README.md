@@ -2,7 +2,7 @@
 
 A new Flutter project.
 
-## Getting Started
+## Overview
 
 A cross-platform mobile application built with Flutter that provides real-time tracking for both Azan (astronomical prayer times) and Iqama (mosque congregation times). By utilizing the adhan and geolocator packages, the app calculates precise offline prayer times and allows users to set custom offset rules for their local community's Iqama schedule.
 
