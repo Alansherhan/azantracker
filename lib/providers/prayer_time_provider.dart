@@ -25,7 +25,12 @@ enum LocationStatus {
 /// A single prayer with computed azan time and configurable iqama time.
 class PrayerEntry {
   final String name;
-  final DateTime azanTime;
+
+  /// The raw computed azan time (before per-prayer offset).
+  final DateTime _baseAzanTime;
+
+  /// Per-prayer azan offset in minutes (positive = later, negative = earlier).
+  int azanOffsetMinutes;
 
   /// Minutes added (or subtracted if negative) to azan time for iqama.
   int iqamaOffsetMinutes;
@@ -41,14 +46,19 @@ class PrayerEntry {
 
   PrayerEntry({
     required this.name,
-    required this.azanTime,
+    required DateTime azanTime,
+    this.azanOffsetMinutes = 0,
     this.iqamaOffsetMinutes = 0,
     this.useFixedIqama = false,
     this.fixedIqamaHour = 0,
     this.fixedIqamaMinute = 0,
     this.azanAlert = true,
     this.iqamaAlert = true,
-  });
+  }) : _baseAzanTime = azanTime;
+
+  /// Effective azan time with per-prayer offset applied.
+  DateTime get azanTime =>
+      _baseAzanTime.add(Duration(minutes: azanOffsetMinutes));
 
   /// Computed iqama time.
   DateTime get iqamaTime {
@@ -188,6 +198,30 @@ class PrayerTimeProvider extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     _loadSettings();
 
+    // If we have a cached location, use it immediately without requesting GPS.
+    final savedLat = _prefs?.getDouble('location_lat');
+    final savedLng = _prefs?.getDouble('location_lng');
+    if (savedLat != null && savedLng != null) {
+      _position = Position(
+        latitude: savedLat,
+        longitude: savedLng,
+        timestamp: DateTime.now(),
+        accuracy: 0,
+        altitude: 0,
+        heading: 0,
+        speed: 0,
+        speedAccuracy: 0,
+        altitudeAccuracy: 0,
+        headingAccuracy: 0,
+      );
+      _cityName = _prefs?.getString('location_city') ?? 'Unknown';
+      _locationStatus = LocationStatus.fetched;
+      notifyListeners();
+      _calculatePrayerTimes();
+      _startTimer();
+      return;
+    }
+
     await _fetchLocation();
     if (_locationStatus == LocationStatus.fetched) {
       _fetchCityName(); // fire-and-forget
@@ -246,6 +280,9 @@ class PrayerTimeProvider extends ChangeNotifier {
           timeLimit: Duration(seconds: 15),
         ),
       );
+      // Persist coordinates so we don't request GPS on the next launch.
+      await _prefs?.setDouble('location_lat', _position!.latitude);
+      await _prefs?.setDouble('location_lng', _position!.longitude);
       _locationStatus = LocationStatus.fetched;
       notifyListeners();
     } catch (e) {
@@ -270,6 +307,8 @@ class PrayerTimeProvider extends ChangeNotifier {
       _cityName =
           '${_position!.latitude.toStringAsFixed(2)}, ${_position!.longitude.toStringAsFixed(2)}';
     }
+    // Persist the resolved city name.
+    await _prefs?.setString('location_city', _cityName);
     notifyListeners();
   }
 
@@ -277,6 +316,10 @@ class PrayerTimeProvider extends ChangeNotifier {
   Future<void> refreshLocation() async {
     _cityName = 'Loading…';
     notifyListeners();
+    // Clear cached location so a fresh GPS fix is obtained.
+    await _prefs?.remove('location_lat');
+    await _prefs?.remove('location_lng');
+    await _prefs?.remove('location_city');
     await _fetchLocation();
     if (_locationStatus == LocationStatus.fetched) {
       _fetchCityName();
@@ -302,11 +345,25 @@ class PrayerTimeProvider extends ChangeNotifier {
     final dc = DateComponents.from(now);
     final pt = PrayerTimes(coords, dc, params);
 
+    DateTime normalizeToMinute(DateTime t) {
+      final rounded = t.second >= 30 ? t.add(const Duration(minutes: 1)) : t;
+      return DateTime(
+        rounded.year,
+        rounded.month,
+        rounded.day,
+        rounded.hour,
+        rounded.minute,
+      );
+    }
+
     // Apply global minute offset to azan times (but NOT Sunrise — it's fixed astronomical).
-    DateTime adj(DateTime t) => t.add(Duration(minutes: _globalOffset));
+    DateTime adj(DateTime t) =>
+        normalizeToMinute(t.add(Duration(minutes: _globalOffset)));
 
     final fajr = adj(pt.fajr);
-    final sunrise = pt.sunrise; // Sunrise is constant — never shifted by global offset
+    final sunrise = normalizeToMinute(
+      pt.sunrise,
+    ); // Sunrise is constant — never shifted by global offset
     final dhuhr = adj(pt.dhuhr);
     final asr = adj(pt.asr);
     final maghrib = adj(pt.maghrib);
@@ -341,10 +398,12 @@ class PrayerTimeProvider extends ChangeNotifier {
         (_fixedDefaults[name]?[1] ?? 0);
     final azanAlert = _prefs?.getBool('azan_alert_$name') ?? true;
     final iqamaAlert = _prefs?.getBool('iqama_alert_$name') ?? true;
+    final azanOffset = _prefs?.getInt('azan_offset_$name') ?? 0;
 
     return PrayerEntry(
       name: name,
       azanTime: azanTime,
+      azanOffsetMinutes: azanOffset,
       iqamaOffsetMinutes: offset,
       useFixedIqama: isFixed,
       fixedIqamaHour: fixedH,
@@ -376,6 +435,14 @@ class PrayerTimeProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
   // User actions — called from the UI
   // ---------------------------------------------------------------------------
+
+  void updateAzanOffset(String name, int newOffset) {
+    final idx = _prayers.indexWhere((p) => p.name == name);
+    if (idx == -1) return;
+    _prayers[idx].azanOffsetMinutes = newOffset;
+    _prefs?.setInt('azan_offset_$name', newOffset);
+    notifyListeners();
+  }
 
   void updateIqamaOffset(String name, int newOffset) {
     final idx = _prayers.indexWhere((p) => p.name == name);
